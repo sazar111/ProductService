@@ -8,7 +8,12 @@ import com.example.SpringAPI.repositories.CategoryRepository;
 import com.example.SpringAPI.repositories.ProductRepository;
 import com.example.SpringAPI.specifications.ProductSpecification;
 import com.example.SpringAPI.specifications.SpecificationBuilder;
+
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,15 +47,18 @@ public class SelfProductService implements ProductService {
     }
 
     @Override
-    public List<Product> getAllProducts(Map<String, String> filters) {
+    public Page<Product> getAllProducts(Map<String, String> filters, int page, int size, String sortBy) {
 
-        Specification<Product> spec = Specification.where(null);
-        for(Map.Entry<String, String> entry: filters.entrySet()) {
+        Specification<Product> spec = filters.entrySet().stream()
+                .map(entry -> ProductSpecification.hasField(entry.getKey(), entry.getValue()))
+                .reduce(Specification::and)
+                .orElse(null);  // If no filters, pass `null`
 
-           spec= spec.and(ProductSpecification.hasField(entry.getKey(),entry.getValue()));
-        }
-        return productRepository.findAll(spec);
+        Pageable pageable = (Pageable) PageRequest.of(page, size, Sort.by(sortBy));
+
+        return productRepository.findAll(spec, pageable);  // ✅ Returns Page<Product>
     }
+
 
     @Override
     public List<Category> getAllCategories() {

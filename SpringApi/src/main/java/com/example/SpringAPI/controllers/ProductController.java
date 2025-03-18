@@ -10,7 +10,9 @@ import com.example.SpringAPI.models.Product;
 import com.example.SpringAPI.services.ProductService;
 import com.example.SpringAPI.services.SelfProductService;
 import lombok.experimental.Delegate;
+
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -33,19 +35,22 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public Product getProductById(@PathVariable("id") UUID id, @RequestBody TokenRequestDto token ) throws ProductNotFoundException, UnauthorizedException {
-        if(authCommon.validateToken(token.getToken())==false) throw new UnauthorizedException("");
+    public Product getProductById(@PathVariable("id") UUID id) throws ProductNotFoundException, UnauthorizedException {
+
         return productService.getProductById(id);
     }
 
     @GetMapping("")
-    public ResponseEntity<List<Product>> getAllProducts(
-            @RequestParam Map<String, String> filters
-    ){
+    public ResponseEntity<Page<Product>> getProducts(
+            @RequestParam Map<String, String> filters, // Collects all query parameters
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy) {
         //return ResponseEntity.ok(getAllProducts(filters));
-        List<Product> products= productService.getAllProducts(filters);
+        Page<Product> products= productService.getAllProducts(filters,page,size,sortBy);
         return ResponseEntity.ok(products);
     }
+
     @GetMapping("/categories")
     public List<Category> getAllCategories() {
         return productService.getAllCategories();

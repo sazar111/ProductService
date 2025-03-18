@@ -5,6 +5,7 @@ import com.example.SpringAPI.dtos.FakeStoreProductDto;
 import com.example.SpringAPI.dtos.ProductDto;
 import com.example.SpringAPI.models.Category;
 import com.example.SpringAPI.models.Product;
+import org.springframework.data.domain.Page;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -51,14 +52,14 @@ public class FakeStoreProductService implements ProductService{
     }
 
     @Override
-    public List<Product> getAllProducts(Map<String, String> filters) {
+    public Page<Product> getAllProducts(Map<String, String> filters, int page, int size, String sortBy) {
         FakeStoreProductDto[] productDtos= restTemplate.getForObject("https://fakestoreapi.com/products", FakeStoreProductDto[].class);
         List<Product> products = new ArrayList<>();
 
         for(FakeStoreProductDto productDto: productDtos){
             products.add(convertProductDtoToProduct(productDto));
         }
-        return products;
+        return (Page<Product>) products;
     }
 
     @Override

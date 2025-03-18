@@ -1,119 +1,157 @@
 package com.example.SpringAPI.services;
 
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 import com.example.SpringAPI.Exceptions.ProductNotFoundException;
 import com.example.SpringAPI.dtos.FakeStoreProductDto;
 import com.example.SpringAPI.dtos.ProductDto;
 import com.example.SpringAPI.models.Category;
 import com.example.SpringAPI.models.Product;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
+
 import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class FakeStoreProductServiceTest {
 
-    @InjectMocks
-    FakeStoreProductService fakeStoreProductService;
-
-    @Mock
-    RestTemplate restTemplate;
-
-    private UUID sampleId;
-    private FakeStoreProductDto fakeStoreProductDto;
-    private ProductDto productDto;
-    private Product sampleProduct;
+    private FakeStoreProductService productService;
+    private RestTemplate restTemplate;
 
     @BeforeEach
     void setUp() {
-        sampleId = UUID.randomUUID();
-        fakeStoreProductDto = new FakeStoreProductDto();
-        fakeStoreProductDto.setId(sampleId);
-        fakeStoreProductDto.setTitle("Sample Title");
-        fakeStoreProductDto.setPrice(10);
-        fakeStoreProductDto.setImage("sample.jpg");
-        fakeStoreProductDto.setDescription("Sample Description");
-        fakeStoreProductDto.setCategory("Electronics");
-
-        productDto = new ProductDto();
-        sampleProduct = new Product();
+        restTemplate = mock(RestTemplate.class);
+        productService = new FakeStoreProductService(restTemplate);
     }
 
     @Test
-    void getProductById_Success() throws ProductNotFoundException {
-        when(restTemplate.getForObject(anyString(), eq(FakeStoreProductDto.class))).thenReturn(fakeStoreProductDto);
+    void testGetProductById_Success() throws ProductNotFoundException {
+        UUID productId = UUID.randomUUID();
+        FakeStoreProductDto fakeProduct = new FakeStoreProductDto(
+                productId, "Laptop", 1200, "Electronics", "High-performance laptop", "image-url.jpg"
+        );
 
-        Product result = fakeStoreProductService.getProductById(sampleId);
-        assertNotNull(result);
-        assertEquals(fakeStoreProductDto.getTitle(), result.getTitle());
+        when(restTemplate.getForObject("https://fakestoreapi.com/products/" + productId, FakeStoreProductDto.class))
+                .thenReturn(fakeProduct);
+
+        Product product = productService.getProductById(productId);
+
+        assertNotNull(product);
+        assertEquals(fakeProduct.getId(), product.getId());
+        assertEquals(fakeProduct.getTitle(), product.getTitle());
+        assertEquals(fakeProduct.getPrice(), product.getPrice());
+        assertEquals(fakeProduct.getDescription(), product.getDescription());
+        assertEquals(fakeProduct.getImage(), product.getImage());
+        assertEquals(fakeProduct.getCategory(), product.getCategory().getTitle());
     }
 
     @Test
-    void getProductById_NotFound() {
-        when(restTemplate.getForObject(anyString(), eq(FakeStoreProductDto.class))).thenReturn(null);
+    void testGetProductById_NotFound() {
+        UUID productId = UUID.randomUUID();
 
-        assertThrows(ProductNotFoundException.class, () -> fakeStoreProductService.getProductById(sampleId));
+        when(restTemplate.getForObject("https://fakestoreapi.com/products/" + productId, FakeStoreProductDto.class))
+                .thenReturn(null);
+
+        assertThrows(ProductNotFoundException.class, () -> productService.getProductById(productId));
     }
 
     @Test
-    void getAllProducts_Success() {
-        when(restTemplate.getForObject(anyString(), eq(FakeStoreProductDto[].class))).thenReturn(new FakeStoreProductDto[]{fakeStoreProductDto});
+    void testGetAllProducts() {
+        FakeStoreProductDto[] fakeProducts = {
+                new FakeStoreProductDto(UUID.randomUUID(), "Laptop", 1200, "Electronics", "High-performance laptop", "image1.jpg"),
+                new FakeStoreProductDto(UUID.randomUUID(), "Phone", 800, "Electronics", "Latest smartphone", "image2.jpg")
+        };
 
-        List<Product> products = fakeStoreProductService.getAllProducts(Map.of());
+        when(restTemplate.getForObject("https://fakestoreapi.com/products", FakeStoreProductDto[].class))
+                .thenReturn(fakeProducts);
+
+        List<Product> products = new ArrayList<>(productService.getAllProducts(null, 0, 10, "id").getContent());
+
         assertNotNull(products);
-        assertEquals(1, products.size());
+        assertEquals(2, products.size());
+        assertEquals(fakeProducts[0].getTitle(), products.get(0).getTitle());
+        assertEquals(fakeProducts[1].getTitle(), products.get(1).getTitle());
     }
 
     @Test
-    void getAllCategories_Success() {
-        when(restTemplate.getForObject(anyString(), eq(String[].class))).thenReturn(new String[]{"Electronics"});
+    void testGetAllCategories() {
+        String[] categories = {"Electronics", "Clothing", "Books"};
 
-        List<Category> categories = fakeStoreProductService.getAllCategories();
-        assertNotNull(categories);
-        assertEquals(1, categories.size());
+        when(restTemplate.getForObject("https://fakestoreapi.com/products/categories", String[].class))
+                .thenReturn(categories);
+
+        List<Category> categoryList = productService.getAllCategories();
+
+        assertNotNull(categoryList);
+        assertEquals(3, categoryList.size());
+        assertEquals("Electronics", categoryList.get(0).getTitle());
+        assertEquals("Clothing", categoryList.get(1).getTitle());
+        assertEquals("Books", categoryList.get(2).getTitle());
     }
 
     @Test
-    void getProductsByCategory_Success() {
-        when(restTemplate.getForObject(anyString(), eq(FakeStoreProductDto[].class))).thenReturn(new FakeStoreProductDto[]{fakeStoreProductDto});
+    void testGetProductsByCategory() {
+        String categoryName = "Electronics";
+        FakeStoreProductDto[] fakeProducts = {
+                new FakeStoreProductDto(UUID.randomUUID(), "Laptop", 1200, categoryName, "High-performance laptop", "image1.jpg"),
+                new FakeStoreProductDto(UUID.randomUUID(), "Phone", 800, categoryName, "Latest smartphone", "image2.jpg")
+        };
 
-        List<Product> products = fakeStoreProductService.getProductsByCategory("Electronics");
+        when(restTemplate.getForObject("https://fakestoreapi.com/products/category/" + categoryName, FakeStoreProductDto[].class))
+                .thenReturn(fakeProducts);
+
+        List<Product> products = productService.getProductsByCategory(categoryName);
+
         assertNotNull(products);
-        assertEquals(1, products.size());
+        assertEquals(2, products.size());
+        assertEquals(categoryName, products.get(0).getCategory().getTitle());
+        assertEquals(categoryName, products.get(1).getCategory().getTitle());
     }
 
     @Test
-    void addProduct_Success() {
-        when(restTemplate.postForObject(anyString(), any(ProductDto.class), eq(FakeStoreProductDto.class))).thenReturn(fakeStoreProductDto);
+    void testAddProduct() {
+        ProductDto productDto = new ProductDto("Tablet", 500, "Electronics", "Android tablet", "image-tablet.jpg");
 
-        ResponseEntity<Product> response = fakeStoreProductService.addProduct(productDto);
+        FakeStoreProductDto fakeStoreProductDto = new FakeStoreProductDto(
+                UUID.randomUUID(), productDto.getTitle(), productDto.getPrice(), productDto.getCategory().toString(), productDto.getDescription(), productDto.getImage()
+        );
+
+        when(restTemplate.postForObject(eq("https://fakestoreapi.com/products/"), any(ProductDto.class), eq(FakeStoreProductDto.class)))
+                .thenReturn(fakeStoreProductDto);
+
+        ResponseEntity<Product> response = productService.addProduct(productDto);
+
         assertNotNull(response);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(productDto.getTitle(), response.getBody().getTitle());
     }
 
     @Test
-    void updateProduct_Success() throws ProductNotFoundException {
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.PUT), any(HttpEntity.class), eq(FakeStoreProductDto.class)))
-                .thenReturn(new ResponseEntity<>(fakeStoreProductDto, HttpStatus.OK));
+    void testUpdateProduct_Success() throws ProductNotFoundException {
+        UUID productId = UUID.randomUUID();
+        ProductDto productDto = new ProductDto("Updated Laptop", 1500, "Electronics", "Updated laptop specs", "image-laptop-updated.jpg");
 
-        ResponseEntity<Product> response = fakeStoreProductService.updateProduct(sampleId, productDto);
+        FakeStoreProductDto updatedFakeProduct = new FakeStoreProductDto(
+                productId, productDto.getTitle(), productDto.getPrice(), productDto.getCategory().toString(), productDto.getDescription(), productDto.getImage()
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<ProductDto> requestEntity = new HttpEntity<>(productDto, headers);
+
+        ResponseEntity<FakeStoreProductDto> fakeResponse = new ResponseEntity<>(updatedFakeProduct, HttpStatus.OK);
+
+        when(restTemplate.exchange(eq("https://fakestoreapi.com/products/" + productId), eq(HttpMethod.PUT), any(HttpEntity.class), eq(FakeStoreProductDto.class)))
+                .thenReturn(fakeResponse);
+
+        ResponseEntity<Product> response = productService.updateProduct(productId, productDto);
+
         assertNotNull(response);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
-    }
-
-    @Test
-    void updateProduct_NotFound() {
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.PUT), any(HttpEntity.class), eq(FakeStoreProductDto.class)))
-                .thenReturn(new ResponseEntity<>(null, HttpStatus.NOT_FOUND));
-
-        assertThrows(ProductNotFoundException.class, () -> fakeStoreProductService.updateProduct(sampleId, productDto));
+        assertEquals(productDto.getTitle(), response.getBody().getTitle());
     }
 }

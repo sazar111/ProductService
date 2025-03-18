@@ -14,7 +14,7 @@ import lombok.Setter;
 public class Product extends BaseClass{
     String title;
     int price;
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne(cascade = CascadeType.PERSIST)
     Category category;
     String description;
     String image;

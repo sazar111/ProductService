@@ -17,6 +17,7 @@ import java.util.UUID;
 public class BaseClass {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(columnDefinition = "BINARY(16)")
     UUID id;
     @LastModifiedDate
     LocalDateTime lastModifiedDate;

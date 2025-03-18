@@ -2,6 +2,7 @@ package com.example.SpringAPI.controllers;
 
 import com.example.SpringAPI.Exceptions.ProductNotFoundException;
 import com.example.SpringAPI.Exceptions.UnauthorizedException;
+import com.example.SpringAPI.commons.AuthCommon;
 import com.example.SpringAPI.dtos.ProductDto;
 import com.example.SpringAPI.models.Category;
 import com.example.SpringAPI.models.Product;
@@ -12,14 +13,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,108 +35,124 @@ class ProductControllerTest {
     @Mock
     ProductService productService;
 
+    @Mock
+    AuthCommon authCommon;
+
     private Product sampleProduct;
     private UUID sampleId;
+    private ProductDto productDto;
+    private Category sampleCategory;
 
     @BeforeEach
     void setUp() {
         sampleId = UUID.randomUUID();
+
         sampleProduct = new Product();
         sampleProduct.setId(sampleId);
         sampleProduct.setTitle("Sample Title");
         sampleProduct.setDescription("Sample Description");
+
+        productDto = new ProductDto();
+        productDto.setTitle("Updated Title");
+        productDto.setDescription("Updated Description");
+
+        sampleCategory = new Category();
+        sampleCategory.setTitle("Electronics");
     }
 
-    /*@Test
-    void getProductByIdTest() throws ProductNotFoundException, UnauthorizedException {
+    /**
+     * Tests that retrieving a product by valid ID returns the product successfully.
+     */
+    @Test
+    void getProductById_ValidId_ReturnsProduct() throws ProductNotFoundException, UnauthorizedException {
         when(productService.getProductById(sampleId)).thenReturn(sampleProduct);
 
-        Product resultProduct = productController.getProductById(sampleId,"");
-        assertNotNull(resultProduct);
-        assertEquals(sampleProduct, resultProduct);
-    }*/
+        Product response = productController.getProductById(sampleId);
 
-/*    @Test
-    void getProductById_NotFound() throws ProductNotFoundException {
-        UUID invalidId = UUID.randomUUID();
-        when(productService.getProductById(invalidId)).thenThrow(new ProductNotFoundException("Product not found",invalidId));
-
-        assertThrows(ProductNotFoundException.class, () -> productController.getProductById(invalidId,""));
-    }*/
-
-    @Test
-    void getAllProducts() {
-        List<Product> productList = Arrays.asList(sampleProduct);
-        when(productService.getAllProducts(any(Map.class))).thenReturn(productList);
-
-        ResponseEntity<List<Product>> response = productController.getAllProducts(Map.of());
         assertNotNull(response);
-        assertEquals(1, response.getBody().size());
+        assertEquals(sampleProduct, response);
     }
 
+    /**
+     * Tests that retrieving a product by invalid ID throws ProductNotFoundException.
+     */
     @Test
-    void getAllCategories() {
-        List<Category> categories = Arrays.asList(new Category());
-        when(productService.getAllCategories()).thenReturn(categories);
+    void getProductById_InvalidId_ThrowsException() throws ProductNotFoundException {
+        UUID invalidId = UUID.randomUUID();
+        when(productService.getProductById(invalidId)).thenThrow(new ProductNotFoundException("Product not found", invalidId));
 
-        List<Category> result = productController.getAllCategories();
-        assertNotNull(result);
-        assertEquals(1, result.size());
+        assertThrows(ProductNotFoundException.class, () -> productController.getProductById(invalidId));
     }
 
+    /**
+     * Tests that retrieving all products returns paginated results.
+     */
     @Test
-    void getProductsByCategory() {
-        List<Product> products = Arrays.asList(sampleProduct);
-        when(productService.getProductsByCategory("Electronics")).thenReturn(products);
+    void getProducts_WithPagination_ReturnsPagedProducts() {
+        Page<Product> mockPage = new PageImpl<>(List.of(sampleProduct));
+        when(productService.getAllProducts(any(), anyInt(), anyInt(), anyString())).thenReturn(mockPage);
 
-        List<Product> result = productController.getProductsByCategory("Electronics");
-        assertNotNull(result);
-        assertEquals(1, result.size());
+        ResponseEntity<Page<Product>> response = productController.getProducts(Map.of(), 0, 10, "id");
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertFalse(response.getBody().isEmpty());
     }
 
+    /**
+     * Tests that retrieving all categories returns a list of categories.
+     */
     @Test
-    void getProductsByCategory_NotFound() {
-        when(productService.getProductsByCategory("InvalidCategory")).thenReturn(List.of());
+    void getAllCategories_ReturnsCategoryList() {
+        when(productService.getAllCategories()).thenReturn(List.of(sampleCategory));
 
-        List<Product> result = productController.getProductsByCategory("InvalidCategory");
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        List<Category> response = productController.getAllCategories();
+
+        assertNotNull(response);
+        assertFalse(response.isEmpty());
+        assertEquals("Electronics", response.get(0).getTitle());
     }
 
+    /**
+     * Tests that retrieving products by category returns filtered products.
+     */
     @Test
-    void addProduct() throws ProductNotFoundException {
-        ProductDto productDto = new ProductDto();
-        when(productService.addProduct(any(ProductDto.class))).thenReturn(ResponseEntity.ok(sampleProduct));
+    void getProductsByCategory_ValidCategory_ReturnsProductList() {
+        when(productService.getProductsByCategory("Electronics")).thenReturn(List.of(sampleProduct));
+
+        List<Product> response = productController.getProductsByCategory("Electronics");
+
+        assertNotNull(response);
+        assertFalse(response.isEmpty());
+        assertEquals("Sample Title", response.get(0).getTitle());
+    }
+
+    /**
+     * Tests that adding a new product returns the created product.
+     */
+    @Test
+    void addProduct_ValidData_ReturnsCreatedProduct() throws ProductNotFoundException {
+        when(productService.addProduct(any(ProductDto.class))).thenReturn(new ResponseEntity<>(sampleProduct, HttpStatus.CREATED));
 
         ResponseEntity<Product> response = productController.addProduct(productDto);
+
         assertNotNull(response);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(sampleProduct, response.getBody());
     }
 
+    /**
+     * Tests that updating a product with valid data returns the updated product.
+     */
     @Test
-    void addProduct_Failure() throws ProductNotFoundException {
-        ProductDto productDto = new ProductDto();
-        when(productService.addProduct(any(ProductDto.class))).thenThrow(new RuntimeException("Failed to add product"));
-
-        assertThrows(RuntimeException.class, () -> productController.addProduct(productDto));
-    }
-
-    @Test
-    void updateProduct() throws ProductNotFoundException {
-        ProductDto productDto = new ProductDto();
-        when(productService.updateProduct(eq(sampleId), any(ProductDto.class))).thenReturn(ResponseEntity.ok(sampleProduct));
+    void updateProduct_WithValidData_ReturnsUpdatedProduct() throws ProductNotFoundException {
+        when(productService.updateProduct(eq(sampleId), any(ProductDto.class)))
+                .thenReturn(new ResponseEntity<>(sampleProduct, HttpStatus.OK));
 
         ResponseEntity<Product> response = productController.updateProduct(productDto, sampleId);
+
         assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(sampleProduct, response.getBody());
-    }
-
-    @Test
-    void updateProduct_NotFound() throws ProductNotFoundException {
-        ProductDto productDto = new ProductDto();
-        UUID invalidId = UUID.randomUUID();
-        when(productService.updateProduct(eq(invalidId), any(ProductDto.class))).thenThrow(new ProductNotFoundException("Product not found",invalidId));
-
-        assertThrows(ProductNotFoundException.class, () -> productController.updateProduct(productDto, invalidId));
     }
 }

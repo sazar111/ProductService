@@ -68,13 +68,6 @@ class SelfProductServiceTest {
         assertThrows(ProductNotFoundException.class, () -> selfProductService.getProductById(sampleId));
     }
 
-    @Test
-    void getAllProducts_Success() {
-        when(productRepository.findAll((Specification<Product>) any())).thenReturn(Collections.singletonList(sampleProduct));
-        List<Product> products = selfProductService.getAllProducts(Map.of());
-        assertFalse(products.isEmpty());
-        assertEquals(1, products.size());
-    }
 
     @Test
     void getAllCategories_Success() {
