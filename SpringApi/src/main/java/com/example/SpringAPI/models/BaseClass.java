@@ -1,5 +1,6 @@
 package com.example.SpringAPI.models;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,6 +15,7 @@ import java.util.UUID;
 @Setter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
+@JsonSerialize
 public class BaseClass {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)

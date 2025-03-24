@@ -31,15 +31,24 @@ public class SelfProductService implements ProductService {
     final ProductRepository productRepository;
     final CategoryRepository categoryRepository;
 
-    public SelfProductService(ProductRepository productRepository,CategoryRepository categoryRepository) {
+    ProductCacheService productCacheService;
+
+    public SelfProductService(ProductRepository productRepository,CategoryRepository categoryRepository,ProductCacheService productCacheService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.productCacheService = productCacheService;
     }
 
     @Override
     public Product getProductById(UUID id) throws ProductNotFoundException {
+        Optional<Product> product= productCacheService.getProductFromCache(id);
+        if(!product.isPresent()){
+            product= productRepository.findById(id);
+            if(product.isPresent()){
+                productCacheService.saveProduct(product.get());
+            }
+        }
 
-        Optional<Product> product= productRepository.findById(id);
         if (product.isEmpty()) {
             throw new ProductNotFoundException("No Product with id "+id,id);
         }
